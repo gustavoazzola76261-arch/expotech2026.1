@@ -1,0 +1,411 @@
+:root {
+  color-scheme: light dark;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  --bg: #0f172a;
+  --panel: #111827;
+  --card: #1f2937;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --accent: #38bdf8;
+  --danger: #f87171;
+  --ok: #34d399;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #1e293b, var(--bg));
+  color: var(--text);
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid #273449;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 1rem;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sidebar nav a {
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--muted);
+}
+
+.sidebar nav a.active {
+  background: #1f2937;
+  color: var(--text);
+}
+
+.nav-muted {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.admin-shortcut {
+  margin-top: 1rem;
+}
+
+.admin-shortcut h3 {
+  margin-top: 0;
+}
+
+.inline-link {
+  color: var(--accent);
+  font-weight: 600;
+  display: inline-block;
+  margin-top: 0.35rem;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.user-chip {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: #111827;
+  border: 1px solid #273449;
+}
+
+.user-name {
+  font-weight: 600;
+}
+
+.user-role {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.main {
+  padding: 1.5rem 2rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid #273449;
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.room-card:hover {
+  border-color: var(--accent);
+}
+
+.room-title {
+  font-weight: 600;
+}
+
+.room-code {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error-banner {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecdd3;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
+button {
+  background: var(--accent);
+  color: #0b1220;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.link-button {
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  padding-left: 0;
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.login-card input {
+  border-radius: 0.5rem;
+  border: 1px solid #273449;
+  background: #0b1220;
+  color: var(--text);
+  padding: 0.55rem 0.65rem;
+}
+
+.lamp-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  border: 1px solid #273449;
+}
+
+.status-pill.on {
+  border-color: rgba(52, 211, 153, 0.5);
+  color: var(--ok);
+}
+
+.status-pill.off {
+  color: var(--muted);
+}
+
+.back-link {
+  color: var(--accent);
+  display: inline-block;
+  margin-bottom: 0.75rem;
+}
+
+.metric {
+  margin-top: 1rem;
+  max-width: 320px;
+}
+
+.metric-label {
+  color: var(--muted);
+}
+
+.metric-value {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.stack label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.stack input,
+.stack select {
+  border-radius: 0.5rem;
+  border: 1px solid #273449;
+  background: #0b1220;
+  color: var(--text);
+  padding: 0.55rem 0.65rem;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 0.45rem 0.35rem;
+  border-bottom: 1px solid #273449;
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.small {
+  font-size: 0.85rem;
+  margin: 0 0 0.5rem;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid #334155;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+}
+
+.consumption-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.toolbar-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  background: #0b1220;
+  border: 1px solid #334155;
+  color: var(--muted);
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chip:hover {
+  color: var(--text);
+}
+
+.chip-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+.period-total {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+}
+
+.chart-card {
+  margin-top: 1rem;
+}
+
+.chart-title {
+  margin-top: 0;
+}
+
+.chart-wrap {
+  width: 100%;
+  min-height: 380px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 1rem;
+}
+
+.modal-panel {
+  width: min(480px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkbox-row input {
+  width: auto;
+}
