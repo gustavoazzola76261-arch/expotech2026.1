@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import require_roles
 from app.database import get_db
 from app.models import ActuationLog, Lamp, User, UserRole
-from app.schemas.consumption import ConsumptionMonthlyPoint, ConsumptionMonthlyResponse, ConsumptionSummary
+from app.schemas.consumption import (
+    ConsumptionMonthlyPoint,
+    ConsumptionMonthlyResponse,
+    ConsumptionSummary,
+    EnelTariffInfo,
+)
+from app.services.enel_tariff import energy_cost_brl, tariff_info
 
 router = APIRouter(prefix="/consumption", tags=["consumption"])
 
@@ -49,7 +55,12 @@ def consumption_summary(
         ActuationLog.lamp_id.in_(lamp_ids_subq),
     )
     total = db.scalar(stmt)
-    return ConsumptionSummary(total_kwh=Decimal(str(total or 0)))
+    total_kwh = Decimal(str(total or 0))
+    return ConsumptionSummary(
+        total_kwh=total_kwh,
+        total_brl=energy_cost_brl(total_kwh),
+        tariff=EnelTariffInfo(**tariff_info()),
+    )
 
 
 @router.get("/monthly", response_model=ConsumptionMonthlyResponse)
@@ -98,13 +109,25 @@ def consumption_monthly(
         by_month[key] = Decimal(str(row[1] or 0))
 
     keys = _month_keys_between(start, now)
-    points = [ConsumptionMonthlyPoint(year_month=k, kwh=by_month.get(k, Decimal("0"))) for k in keys]
-    total_period = sum((p.kwh for p in points), Decimal("0"))
+    points = []
+    for k in keys:
+        kwh = by_month.get(k, Decimal("0"))
+        points.append(
+            ConsumptionMonthlyPoint(
+                year_month=k,
+                kwh=kwh,
+                brl=energy_cost_brl(kwh),
+            )
+        )
+    total_kwh = sum((p.kwh for p in points), Decimal("0"))
+    total_brl = sum((p.brl for p in points), Decimal("0"))
 
     return ConsumptionMonthlyResponse(
         months_window=months,
         period_start=start,
         period_end=now,
         points=points,
-        total_kwh_in_period=total_period,
+        total_kwh_in_period=total_kwh,
+        total_brl_in_period=total_brl,
+        tariff=EnelTariffInfo(**tariff_info()),
     )

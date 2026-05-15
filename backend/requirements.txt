@@ -16,3 +16,7 @@ bcrypt==4.0.1
 python-multipart==0.0.17
 slowapi==0.1.9
 python-dateutil==2.9.0.post0
+
+crewai>=0.86.0,<1.0.0
+litellm>=1.55.0,<2.0.0
+starlette>=0.40.0,<0.42.0

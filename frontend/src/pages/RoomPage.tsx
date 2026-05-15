@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
+import { RoomFloorPlan } from "../components/RoomFloorPlan";
 import type { Lamp, Me, Room } from "../types";
 
 async function fetchLamps(roomId: string): Promise<Lamp[]> {
@@ -40,35 +41,30 @@ export function RoomPage() {
 
   const roomTitle = rooms?.find((r) => String(r.id) === id)?.name;
 
+  function toggleLamp(lamp: Lamp) {
+    const action = lamp.is_on ? "off" : "on";
+    mutation.mutate({ lampId: lamp.id, action });
+  }
+
   if (!id) return null;
   if (isLoading) return <p className="muted">Carregando lâmpadas…</p>;
   if (error) return <p className="error-banner">{(error as Error).message}</p>;
 
   return (
-    <div>
+    <div className="room-page">
       {me?.role !== "professor" && (
         <Link to="/" className="back-link">
           ← Voltar às salas
         </Link>
       )}
       <h2>{roomTitle ?? `Sala #${id}`}</h2>
-      <div className="grid">
-        {data?.map((lamp) => (
-          <div key={lamp.id} className="card lamp-card">
-            <div className="lamp-title">{lamp.name}</div>
-            <div className="muted">{lamp.power_watts} W · slot {lamp.slot}</div>
-            <div className={`status-pill ${lamp.is_on ? "on" : "off"}`}>{lamp.is_on ? "Ligada" : "Desligada"}</div>
-            <div className="row-actions">
-              <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ lampId: lamp.id, action: "on" })}>
-                Ligar
-              </button>
-              <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate({ lampId: lamp.id, action: "off" })}>
-                Desligar
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+      <p className="muted room-page-hint">Clique em uma lâmpada para ligar ou desligar.</p>
+
+      {data && data.length > 0 ? (
+        <RoomFloorPlan lamps={data} disabled={mutation.isPending} onToggle={toggleLamp} />
+      ) : (
+        <p className="muted">Nenhuma lâmpada cadastrada nesta sala.</p>
+      )}
     </div>
   );
 }

@@ -1,27 +1,99 @@
-# Environment
+# =============================================================================
+# Segredos e ambiente — NUNCA commitar
+# =============================================================================
 .env
-.env.local
-*.pem
+.env.*
+!.env.example
+!.env.*.example
 
+backend/.env
+frontend/.env
+IA/.env
+
+# Chaves locais / certificados
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+*.credentials
+secrets.json
+credentials.json
+
+# ESP32 — copie de config.h.example e preencha localmente
+esp32/campus_iot/config.h
+
+# Script local com chave Groq (use crewAI.py.example como modelo)
+crewAI.py
+
+# =============================================================================
 # Python
+# =============================================================================
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
 .venv/
 venv/
+env/
+ENV/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+htmlcov/
+.tox/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+build/
+dist/
+*.egg
 
-# Node
+# =============================================================================
+# Node / frontend
+# =============================================================================
 node_modules/
+frontend/dist/
 dist/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# IDE
+# =============================================================================
+# Banco e dumps locais
+# =============================================================================
+*.sqlite
+*.sqlite3
+*.db
+dump.sql
+*.dump
+
+# =============================================================================
+# IDE e ferramentas
+# =============================================================================
 .idea/
 .vscode/
+*.swp
+*~
+.cursor/
 
-# OS
+# =============================================================================
+# SO
+# =============================================================================
 .DS_Store
 Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# =============================================================================
+# Build / cache diversos
+# =============================================================================
+*.bak
+*.tmp
+.cache/
+.turbo/

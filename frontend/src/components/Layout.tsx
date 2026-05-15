@@ -42,9 +42,17 @@ export function Layout() {
               Salas
             </NavLink>
           )}
+          {(me?.role === "admin" || me?.role === "mestre") && (
+            <>
+              <NavLink to="/admin/salas">Gerenciar salas</NavLink>
+              <NavLink to="/programacao">Programação</NavLink>
+            </>
+          )}
           {me?.role === "admin" && (
             <>
               <NavLink to="/relatorios">Consumo</NavLink>
+              <NavLink to="/ia">IA</NavLink>
+              <NavLink to="/admin/historico">Histórico</NavLink>
               <NavLink to="/admin/usuarios">Usuários</NavLink>
             </>
           )}

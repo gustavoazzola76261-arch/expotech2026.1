@@ -10,3 +10,11 @@ class UserRole(str, enum.Enum):
 class LampAction(str, enum.Enum):
     on = "on"
     off = "off"
+
+
+class ScheduleScope(str, enum.Enum):
+    all = "all"
+    room = "room"
+    rooms_group = "rooms_group"
+    lamp = "lamp"
+    lamps_group = "lamps_group"

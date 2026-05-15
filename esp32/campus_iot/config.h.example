@@ -1,0 +1,32 @@
+/**
+ * Copie este arquivo para config.h e preencha com seus dados.
+ * Não commite config.h com senhas reais.
+ */
+#pragma once
+
+#define WIFI_SSID "SUA_REDE_WIFI"
+#define WIFI_PASSWORD "SUA_SENHA_WIFI"
+
+/** IP do PC/servidor onde roda a API (não use localhost na ESP). Ex: http://192.168.0.50:8000 */
+#define API_BASE_URL "http://192.168.0.50:8000"
+
+/** Mesmo valor de ESP32_DEVICE_KEY no backend/.env */
+#define DEVICE_KEY "change-me-esp32-device-key"
+
+/** Salas controladas por ESTE módulo ESP32 (IDs no banco). Padrão: salas 1 e 2 */
+#define ROOM_IDS "1,2"
+
+/** Intervalo entre consultas à API (ms) */
+#define POLL_INTERVAL_MS 2000
+
+/**
+ * GPIO por sala e slot (slot 1 = frente, 2 = meio, 3 = fundo).
+ * Ajuste conforme seu hardware (relés active-HIGH = lâmpada ligada).
+ */
+#define ROOM1_SLOT1_PIN 25
+#define ROOM1_SLOT2_PIN 26
+#define ROOM1_SLOT3_PIN 27
+
+#define ROOM2_SLOT1_PIN 14
+#define ROOM2_SLOT2_PIN 12
+#define ROOM2_SLOT3_PIN 13

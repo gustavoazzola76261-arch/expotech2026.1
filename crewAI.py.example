@@ -1,0 +1,35 @@
+#!pip install crewai crewai_tools
+#!pip install 'crewai[litellm]'
+#!pip install litellm
+
+import os
+import random
+from crewai import Agent, Task, Crew, Process
+
+# Nunca commite chaves aqui. Use IA/.env ou backend/.env (fora do Git).
+os.environ["GROQ_API_KEY"] = os.environ.get("GROQ_API_KEY", "")
+researcher_agent = Agent(
+    role='Pesquisador Especializado',
+    goal=f"Pesquisar a fundo sobre: Cinema, Filmes, Séries, Diretores, Atores, Roteiristas, Gêneros, História do cinema, Análise de filmes, Tendências atuais no cinema e Curiosidades sobre o cinema.",
+    backstory="Especialista cinema.",
+    verbose=True,
+    allow_delegation=False,
+    llm="groq/llama-3.1-8b-instant"
+)
+
+research_task = Task(
+    description=f"Pesquisar sobre {topico_pesquisa} e gerar um resumo.",
+    expected_output="Resumo claro e objetivo",
+    agent=researcher_agent
+)
+research_crew = Crew(
+    agents=[researcher_agent],
+    tasks=[research_task],
+    process=Process.sequential
+)
+
+print("## Iniciando a pesquisa...")
+result = research_crew.kickoff()
+
+print("\n## Resultado:")
+print(result)

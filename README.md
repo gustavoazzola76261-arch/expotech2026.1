@@ -1,77 +1,273 @@
-# Campus IoT — Automação de infraestrutura acadêmica
+# Campus IoT — Automação de Infraestrutura Acadêmica
 
-Sistema **API-first** para controle de iluminação por sala, com **FastAPI (Python)**, **PostgreSQL (Supabase/local)**, **React (TypeScript)** e autenticação **OAuth2 Password Grant + JWT**.
+Projeto acadêmico da **Expotech 2026** para controle inteligente de iluminação em salas de faculdade, com API REST, interface web, integração IoT (ESP32) e análise energética assistida por IA.
 
-Documento de requisitos: `REQUISITOS_SISTEMA.md`.
+Documento de requisitos detalhado: [`REQUISITOS_SISTEMA.md`](REQUISITOS_SISTEMA.md).
 
-**Guia passo a passo para instalar dependências, configurar o Postgres, subir API e interface:** veja [`GUIA_EXECUCAO.md`](GUIA_EXECUCAO.md).
+---
 
-## O que já está implementado (Etapas 1–4)
+## Visão geral do projeto
 
-| Etapa | Conteúdo |
-|-------|-----------|
-| **1 — Arquitetura** | Monorepo `backend/` + `frontend/`, API versionada `/api/v1`, camadas (modelos, schemas, serviços, rotas). |
-| **2 — Backend** | FastAPI, OAuth2 (`/api/v1/auth/token`), JWT, RBAC (professor / mestre / admin), CRUD mínimo de usuários (admin), controle de lâmpadas, histórico de acionamentos com cálculo de kWh ao desligar, resumo de consumo (**admin**), rate limit no login. |
-| **3 — Banco** | Modelagem Postgres (usuários, salas, lâmpadas, vínculo professor–sala, logs de acionamento), migrations **Alembic**. |
-| **4 — Frontend** | Login, listagem de salas (mestre/admin), professor direto na sala, controle on/off por lâmpada, resumo de consumo (admin), painel de usuários (admin). |
+O **Campus IoT** é um sistema **API-first** que centraliza o acionamento de lâmpadas por sala, registra histórico de uso, estima consumo em **kWh** e **R$** (tarifa Enel) e oferece painéis por perfil de usuário (professor, mestre, administrador). A arquitetura monorepo separa backend, frontend, firmware e módulo de IA, permitindo evoluir para novos dispositivos (MQTT, sensores, climatização) sem reescrever o núcleo.
 
-**Próximas etapas (não feitas neste ciclo):** firmware ESP32, simulação, IA, hardening ampliado, MQTT.
+O problema atacado é o **desperdício energético** e a **falta de rastreabilidade** em ambientes acadêmicos: lâmpadas ligadas sem necessidade, controle manual descentralizado e ausência de relatórios sobre quem acionou o quê, quando e quanto foi consumido.
 
-## Estrutura do repositório
+---
+
+## Objetivos
+
+| Objetivo | Descrição |
+|----------|-----------|
+| **Automação** | Controlar iluminação por sala e lâmpada de forma remota e programada. |
+| **Economia** | Reduzir desperdício com histórico, relatórios e sugestões de IA. |
+| **Rastreabilidade** | Registrar acionamentos (usuário, data, sala, energia estimada). |
+| **Segurança de acesso** | RBAC por papel e por sala (professor vinculado). |
+| **Escalabilidade** | API versionada e modular para novas salas, dispositivos e integrações. |
+| **IoT** | Sincronizar estado físico via ESP32 consultando a API. |
+| **Inteligência** | Análise de consumo, relatórios e detecção de desperdício com CrewAI + Groq. |
+
+---
+
+## Funcionalidades
+
+### Controle e salas
+
+- Login com OAuth2 (password) + JWT.
+- Dashboard de salas com visualização do estado das lâmpadas.
+- Ligar/desligar lâmpadas individualmente ou em lote (sala inteira / todas as salas).
+- Professor acessa apenas salas vinculadas; mestre e admin gerenciam o campus.
+- CRUD de salas (criação com até 3 lâmpadas por sala).
+
+### Consumo e relatórios
+
+- Cálculo de **kWh** ao desligar (potência × tempo ligado).
+- Estimativa de custo em **R$** com composição tarifária **Enel** (TE + TUSD + bandeira + tributos).
+- Gráficos mensais (1, 3, 6 ou 12 meses) em kWh e R$.
+- Histórico de acionamentos (admin).
+
+### Programação
+
+- Agendamentos por horário: todas as lâmpadas, sala específica, **grupo de salas**, lâmpada específica ou **grupo de lâmpadas**.
+- Executor em background no backend (verificação a cada 30 s).
+
+### Administração
+
+- Gestão de usuários (admin).
+- Papéis: `professor`, `mestre`, `admin`.
+
+### IoT (ESP32)
+
+- Endpoint de estado para firmware (`X-Device-Key`).
+- Guia em [`esp32/GUIA_ESP32.md`](esp32/GUIA_ESP32.md).
+
+### Inteligência artificial
+
+- Agente CrewAI com LLM **Groq** (`IA/`).
+- Análise de consumo, relatório executivo, sugestões de economia e alertas de desperdício.
+- Endpoint `POST /api/v1/ia/insights` e página **IA** no frontend (admin).
+
+---
+
+## Arquitetura
+
+```mermaid
+flowchart TB
+  subgraph clients [Clientes]
+    WEB[React SPA]
+    ESP[ESP32]
+  end
+
+  subgraph backend [Backend FastAPI]
+    API["/api/v1 REST"]
+    AUTH[JWT + RBAC]
+    SVC[Serviços de negócio]
+    SCH[Agendador programações]
+    API --> AUTH
+    API --> SVC
+    SCH --> SVC
+  end
+
+  subgraph data [Dados]
+    PG[(PostgreSQL)]
+  end
+
+  subgraph ai [IA]
+    CREW[CrewAI + Groq]
+  end
+
+  WEB -->|HTTP / proxy Vite| API
+  ESP -->|GET /iot/state| API
+  SVC --> PG
+  API -->|contexto + kickoff| CREW
+```
+
+**Padrões:** API REST, API-first, camadas (rotas → serviços → modelos), monorepo, separação frontend/backend/IA/IoT.
+
+---
+
+## Stack tecnológica
+
+| Camada | Tecnologias |
+|--------|-------------|
+| **Backend** | Python 3.11+, FastAPI, SQLAlchemy 2, Alembic, Pydantic, python-jose, passlib/bcrypt, SlowAPI |
+| **Banco** | PostgreSQL (local ou Supabase) |
+| **Frontend** | React 18, TypeScript, Vite, React Router, TanStack Query, Recharts |
+| **IoT** | ESP32 (Arduino), firmware em `esp32/campus_iot/` |
+| **IA** | CrewAI, LiteLLM, Groq API |
+| **Auth** | OAuth2 Password Grant + JWT |
+
+---
+
+## Estrutura de pastas
 
 ```
-backend/
-  alembic/                 # migrations
-  app/
-    api/v1/endpoints/      # rotas REST
-    core/                  # segurança (JWT, hash)
-    models/                # SQLAlchemy
-    schemas/               # Pydantic
-    services/              # regras de acesso / usuários
-    main.py
-    seed.py                # dados de demonstração
-  requirements.txt
-  .env.example
-frontend/
-  src/                     # React + Vite
-  package.json
-  .env.example
-REQUISITOS_SISTEMA.md
-README.md
+expotech2026/
+├── backend/                 # API FastAPI
+│   ├── alembic/             # Migrations
+│   ├── app/
+│   │   ├── api/v1/endpoints/  # Rotas REST
+│   │   ├── core/              # JWT, hash de senha
+│   │   ├── models/            # SQLAlchemy
+│   │   ├── schemas/           # Pydantic
+│   │   ├── services/          # Regras de negócio, IA context, Enel, scheduler
+│   │   ├── main.py
+│   │   └── seed.py
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/                # SPA React
+│   ├── src/
+│   │   ├── api/             # Cliente HTTP
+│   │   ├── components/
+│   │   └── pages/
+│   ├── package.json
+│   └── vite.config.ts
+├── IA/                      # CrewAI + Groq
+│   ├── crew_energy.py
+│   ├── config.py
+│   └── requirements.txt
+├── esp32/
+│   ├── campus_iot/          # Firmware
+│   └── GUIA_ESP32.md
+├── crewAI.py.example        # Exemplo original CrewAI
+├── REQUISITOS_SISTEMA.md
+└── README.md
 ```
 
-## Pré-requisitos
+---
+
+## Organização do código
+
+### Backend (`backend/app/`)
+
+| Pasta / arquivo | Responsabilidade |
+|-----------------|------------------|
+| `api/v1/endpoints/` | Rotas HTTP por domínio (auth, rooms, lamps, consumption, schedules, ia, iot, admin). |
+| `api/deps.py` | Dependências FastAPI: usuário atual, papéis exigidos. |
+| `models/` | Entidades: `User`, `Room`, `Lamp`, `ActuationLog`, `LampSchedule`, etc. |
+| `schemas/` | Contratos de entrada/saída (Pydantic). |
+| `services/` | Lógica: `access` (RBAC, estado lâmpadas), `rooms`, `enel_tariff`, `scheduler`, `ia_data`. |
+| `core/security.py` | JWT e verificação de senha. |
+| `config.py` | Settings via variáveis de ambiente. |
+
+### Frontend (`frontend/src/`)
+
+| Pasta | Responsabilidade |
+|-------|------------------|
+| `pages/` | Telas: login, salas, consumo, IA, programação, admin. |
+| `components/` | Layout, planta da sala, previews. |
+| `api/client.ts` | `fetch` autenticado e login OAuth2. |
+| `types.ts` | Tipos TypeScript alinhados à API. |
+
+### IA (`IA/`)
+
+| Arquivo | Responsabilidade |
+|---------|------------------|
+| `crew_energy.py` | Agent, Task, Crew (sequencial) e parse do JSON de resposta. |
+| `config.py` | `GROQ_API_KEY`, modelo LLM. |
+
+---
+
+## Instalação
+
+### Pré-requisitos
 
 - Python **3.11+**
-- Node.js **20+** (recomendado)
-- PostgreSQL acessível (local ou **Supabase** — use a *connection string* do painel, **sem** commitar segredos)
+- Node.js **20+**
+- PostgreSQL acessível (local ou [Supabase](https://supabase.com))
+- Chave [Groq](https://console.groq.com) (opcional, para IA)
 
-## Backend — como executar
+### Backend
 
-```bash
+```powershell
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # Windows PowerShell
+.\.venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env          # edite DATABASE_URL, SECRET_KEY, CORS_ORIGINS
+copy .env.example .env
+```
+
+Edite `backend/.env`:
+
+- `DATABASE_URL` — connection string PostgreSQL
+- `SECRET_KEY` — string longa e aleatória
+- `CORS_ORIGINS` — origens do frontend (ex.: `http://localhost:5173`)
+- `GROQ_API_KEY` — para módulo IA (opcional)
+- `ESP32_DEVICE_KEY` — chave do firmware (opcional)
+
+```powershell
 alembic upgrade head
 python -m app.seed
+```
+
+### Frontend
+
+```powershell
+cd frontend
+npm install
+copy .env.example .env
+```
+
+Mantenha `VITE_API_URL` vazio para usar o proxy do Vite.
+
+### IA (opcional, teste isolado)
+
+```powershell
+cd IA
+pip install -r requirements.txt
+copy .env.example .env
+# Defina GROQ_API_KEY
+```
+
+---
+
+## Execução
+
+### Backend
+
+```powershell
+cd backend
+.\.venv\Scripts\activate
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- Documentação interativa: `http://localhost:8000/docs`
-- **Health:** [http://localhost:8000/health](http://localhost:8000/health) ou [http://localhost:8000/api/v1/health](http://localhost:8000/api/v1/health) — `{"status":"ok"}`
-- **Raiz:** [http://localhost:8000/](http://localhost:8000/) — metadados da API (útil para confirmar que o processo certo está no ar)
+- Swagger: http://localhost:8000/docs  
+- Health: http://localhost:8000/health  
 
-### OAuth2 (usuário e senha)
+### Frontend
 
-`POST /api/v1/auth/token` com corpo **form-urlencoded**:
+```powershell
+cd frontend
+npm run dev
+```
 
-- `username`: e-mail do usuário
-- `password`: senha
+- Interface: http://localhost:5173  
 
-Resposta: `{ "access_token": "...", "token_type": "bearer" }`  
-Demais rotas: cabeçalho `Authorization: Bearer <token>`.
+### Acesso na rede local
+
+1. Backend e frontend com `--host 0.0.0.0` / `host: true` (já configurado no Vite).
+2. Descubra o IPv4 (`ipconfig`) e acesse `http://SEU_IP:5173` de outro dispositivo.
+3. Libere portas **5173** e **8000** no firewall (rede privada).
+4. Mantenha `VITE_API_URL` vazio no frontend.
 
 ### Usuários de demonstração (após `seed`)
 
@@ -81,41 +277,170 @@ Demais rotas: cabeçalho `Authorization: Bearer <token>`.
 | `mestre@fecaf.local` | `Mestre12345!` | Mestre |
 | `professor@fecaf.local` | `Professor123!` | Professor (sala 1) |
 
-**Altere essas senhas** antes de qualquer ambiente real.
+Altere essas senhas antes de qualquer ambiente real.
 
-## Frontend — como executar
+---
 
-```bash
-cd frontend
-npm install
-copy .env.example .env        # opcional: VITE_API_URL vazio usa proxy do Vite
-npm run dev
-```
+## Endpoints
 
-Abra `http://localhost:5173`. O proxy encaminha `/api` e `/health` para `http://127.0.0.1:8000`.
+Base: `/api/v1` — autenticação via `Authorization: Bearer <token>` (exceto login e health).
 
-## Endpoints principais
+### Meta
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
-| POST | `/api/v1/auth/token` | Login OAuth2 password |
-| GET | `/api/v1/me` | Perfil + salas (professor) |
-| GET | `/api/v1/rooms` | Lista de salas (filtrada por papel) |
-| GET | `/api/v1/rooms/{id}/lamps` | Lâmpadas da sala |
-| POST | `/api/v1/lamps/{id}/command` | `{"action":"on"\|"off"}` |
-| GET | `/api/v1/consumption/summary` | Soma de kWh (somente **admin**) |
-| GET | `/api/v1/consumption/monthly` | Série mensal de kWh; query `months=1\|3\|6\|12`, opcional `room_id` (**admin**) |
-| GET/POST | `/api/v1/admin/users` | Lista / cria usuário (admin) |
-| PATCH | `/api/v1/admin/users/{id}` | Atualiza usuário (admin) |
+| GET | `/health`, `/api/v1/health` | Health check |
+| GET | `/` | Metadados da API |
 
-## Segurança e LGPD (base)
+### Autenticação e perfil
 
-- Senhas com **bcrypt**; JWT com expiração configurável.
-- Infraestrutura para **rate limiting** (SlowAPI) disponível no app; endpoints podem ser protegidos conforme necessidade.
-- **RBAC** por objeto (sala/lâmpada) para professor.
-- Logs de acionamento com usuário e energia estimada ao desligar.
-- **Não** versionar `.env`, chaves Supabase ou `service_role` — use apenas variáveis de ambiente.
+| Método | Caminho | Descrição | Papel |
+|--------|---------|-----------|--------|
+| POST | `/auth/token` | Login (form: `username`, `password`) | Público |
+| GET | `/me` | Perfil e salas do professor | Autenticado |
 
-## Licença
+### Salas e lâmpadas
 
-Projeto acadêmico — defina a licença conforme a instituição.
+| Método | Caminho | Descrição | Papel |
+|--------|---------|-----------|--------|
+| GET | `/rooms` | Lista salas | Autenticado |
+| GET | `/rooms/overview` | Salas + lâmpadas | Autenticado |
+| POST | `/rooms` | Cria sala + 3 lâmpadas | Mestre, Admin |
+| PATCH | `/rooms/{id}` | Atualiza sala | Mestre, Admin |
+| GET | `/rooms/{id}/lamps` | Lâmpadas da sala | Autenticado |
+| POST | `/rooms/{id}/lamps/all-off` | Desliga todas da sala | Mestre, Admin |
+| POST | `/rooms/{id}/lamps/all-on` | Liga todas da sala | Mestre, Admin |
+| POST | `/lamps/all-off` | Desliga todas (campus) | Mestre, Admin |
+| POST | `/lamps/all-on` | Liga todas (campus) | Mestre, Admin |
+| GET | `/lamps/{id}` | Detalhe lâmpada | Autenticado |
+| POST | `/lamps/{id}/command` | `{"action":"on"\|"off"}` | Autenticado |
+
+### Consumo
+
+| Método | Caminho | Descrição | Papel |
+|--------|---------|-----------|--------|
+| GET | `/consumption/summary` | Total kWh e R$ | Admin |
+| GET | `/consumption/monthly?months=1\|3\|6\|12` | Série mensal | Admin |
+
+### Programação
+
+| Método | Caminho | Descrição | Papel |
+|--------|---------|-----------|--------|
+| GET | `/schedules` | Lista programações | Mestre, Admin |
+| POST | `/schedules` | Cria programação | Mestre, Admin |
+| PATCH | `/schedules/{id}` | Atualiza | Mestre, Admin |
+| DELETE | `/schedules/{id}` | Remove | Mestre, Admin |
+
+Escopos: `all`, `room`, `rooms_group`, `lamp`, `lamps_group`.
+
+### Administração
+
+| Método | Caminho | Descrição | Papel |
+|--------|---------|-----------|--------|
+| GET/POST | `/admin/users` | Usuários | Admin |
+| PATCH | `/admin/users/{id}` | Atualiza usuário | Admin |
+| GET | `/admin/actuations` | Histórico de acionamentos | Admin |
+
+### IoT
+
+| Método | Caminho | Descrição | Auth |
+|--------|---------|-----------|------|
+| GET | `/iot/state?room_ids=1,2` | Estado para ESP32 | Header `X-Device-Key` |
+
+### Inteligência artificial
+
+| Método | Caminho | Descrição | Papel |
+|--------|---------|-----------|--------|
+| POST | `/ia/insights?months=&room_id=` | Análise CrewAI + Groq | Admin |
+
+---
+
+## Segurança
+
+- **Senhas:** hash bcrypt; nunca armazenar texto puro.
+- **JWT:** expiração configurável (`ACCESS_TOKEN_EXPIRE_MINUTES`).
+- **RBAC:** papéis `professor`, `mestre`, `admin`; professor restrito às salas em `user_rooms`.
+- **Rate limiting:** SlowAPI disponível (login e rotas sensíveis).
+- **CORS:** origens configuráveis + regex para rede local (`192.168.x.x`, `10.x.x.x`).
+- **IoT:** chave de dispositivo (`ESP32_DEVICE_KEY` / `X-Device-Key`).
+- **Segredos:** não versionar `.env`, chaves Supabase `service_role` ou `GROQ_API_KEY`.
+- **LGPD (base):** logs com usuário e timestamp; minimizar dados em relatórios de IA conforme política institucional.
+
+---
+
+## Status do sprint
+
+| Etapa | Entrega | Status |
+|-------|---------|--------|
+| 1 | Arquitetura monorepo, API `/api/v1` | Concluído |
+| 2 | Backend: auth, RBAC, lâmpadas, consumo, admin | Concluído |
+| 3 | Banco PostgreSQL + Alembic | Concluído |
+| 4 | Frontend: login, salas, consumo, usuários | Concluído |
+| 5 | ESP32: firmware + `/iot/state` | Parcial |
+| 6 | IA: CrewAI + Groq, painel insights | Concluído |
+| — | Programação (grupos salas/lâmpadas) | Concluído |
+| — | Custo R$ (tarifa Enel) | Concluído |
+| — | Acesso frontend na rede LAN | Concluído |
+
+**Em progresso / pendente:** MQTT, hardening ampliado, ESP32 em todas as salas, testes automatizados E2E.
+
+---
+
+## Roadmap
+
+| Fase | Itens |
+|------|--------|
+| **Curto prazo** | MQTT para ESP32; ampliar cobertura de salas no firmware; testes de API. |
+| **Médio prazo** | Simulação de cenários de consumo; cache de insights IA; export PDF dos relatórios. |
+| **Longo prazo** | Novos dispositivos (ar-condicionado, sensores de presença); dashboard em tempo real; integração SSO institucional. |
+
+---
+
+## Equipe
+
+Projeto desenvolvido no contexto acadêmico **Expotech 2026** / FECAF.
+
+| Papel | Responsabilidades |
+|-------|-------------------|
+| **Product / requisitos** | Alinhamento com `REQUISITOS_SISTEMA.md`, escopo e priorização. |
+| **Backend** | API FastAPI, banco, agendador, integração IA e IoT. |
+| **Frontend** | Interface React, UX de salas, consumo e IA. |
+| **IoT** | Firmware ESP32 e documentação de hardware. |
+| **IA** | CrewAI, prompts e validação de insights energéticos. |
+
+Preencha nomes e contatos da equipe conforme a composição oficial do grupo.
+
+---
+
+## Licença futura
+
+Este repositório é um **projeto acadêmico**. A licença definitiva será definida pela instituição de ensino (FECAF) após avaliação do trabalho — por exemplo **MIT**, **Apache 2.0** ou licença institucional proprietária para uso interno.
+
+Até a homologação:
+
+- Uso restrito ao âmbito educacional e demonstrações autorizadas.
+- Não redistribuir credenciais, `.env` ou dados reais de consumidores.
+- Contribuições externas somente mediante acordo com a equipe e a coordenação do curso.
+
+---
+
+## Publicar no GitHub
+
+Antes do primeiro `git push`, execute:
+
+```powershell
+.\scripts\check-before-github.ps1
+```
+
+O repositório **não deve** incluir: `.env` reais, `esp32/campus_iot/config.h`, `crewAI.py` com chaves, `.venv/`, `node_modules/` ou dumps de banco. Use apenas os arquivos `*.env.example` e `config.h.example`.
+
+Detalhes: [`SECURITY.md`](SECURITY.md).
+
+---
+
+## Referências rápidas
+
+- Requisitos: [`REQUISITOS_SISTEMA.md`](REQUISITOS_SISTEMA.md)
+- ESP32: [`esp32/GUIA_ESP32.md`](esp32/GUIA_ESP32.md)
+- Exemplo CrewAI: [`crewAI.py.example`](crewAI.py.example)
+- Configuração IA: [`IA/.env.example`](IA/.env.example)

@@ -22,7 +22,12 @@ def can_control_lamp(db: Session, user: User, lamp: Lamp) -> bool:
     return can_access_room(db, user, lamp.room_id)
 
 
-def set_lamp_state(db: Session, user: User, lamp: Lamp, turn_on: bool) -> ActuationLog:
+def set_lamp_state(
+    db: Session,
+    lamp: Lamp,
+    turn_on: bool,
+    user: User | None = None,
+) -> ActuationLog:
     now = datetime.now(timezone.utc)
     energy_kwh: Decimal | None = None
 
@@ -39,7 +44,38 @@ def set_lamp_state(db: Session, user: User, lamp: Lamp, turn_on: bool) -> Actuat
         lamp.last_on_at = None
         action = LampAction.off
 
-    log = ActuationLog(user_id=user.id, lamp_id=lamp.id, action=action, energy_kwh=energy_kwh)
+    log = ActuationLog(
+        user_id=user.id if user else None,
+        lamp_id=lamp.id,
+        action=action,
+        energy_kwh=energy_kwh,
+    )
     db.add(log)
     db.flush()
     return log
+
+
+def turn_off_all_lamps(db: Session, room_id: int | None = None) -> int:
+    stmt = select(Lamp).where(Lamp.is_on.is_(True))
+    if room_id is not None:
+        stmt = stmt.where(Lamp.room_id == room_id)
+    lamps = db.scalars(stmt).all()
+    count = 0
+    for lamp in lamps:
+        set_lamp_state(db, lamp, turn_on=False, user=None)
+        count += 1
+    db.commit()
+    return count
+
+
+def turn_on_all_lamps(db: Session, room_id: int | None = None) -> int:
+    stmt = select(Lamp).where(Lamp.is_on.is_(False))
+    if room_id is not None:
+        stmt = stmt.where(Lamp.room_id == room_id)
+    lamps = db.scalars(stmt).all()
+    count = 0
+    for lamp in lamps:
+        set_lamp_state(db, lamp, turn_on=True, user=None)
+        count += 1
+    db.commit()
+    return count

@@ -1,7 +1,5 @@
 from pydantic import BaseModel, Field
 
-from app.schemas.room import RoomRead
-
 
 class LampRead(BaseModel):
     id: int
