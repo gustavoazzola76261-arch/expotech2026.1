@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.air_conditioner import AirConditioner
     from app.models.lamp import Lamp
     from app.models.user_room import UserRoom
 
@@ -25,4 +26,9 @@ class Room(Base):
     )
     user_assignments: Mapped[list[UserRoom]] = relationship(
         "UserRoom", back_populates="room", cascade="all, delete-orphan"
+    )
+    air_conditioners: Mapped[list[AirConditioner]] = relationship(
+        "AirConditioner",
+        back_populates="room",
+        cascade="all, delete-orphan",
     )

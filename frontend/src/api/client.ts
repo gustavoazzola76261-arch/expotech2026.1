@@ -11,6 +11,33 @@ export function setToken(token: string | null) {
 
 const apiBase = import.meta.env.VITE_API_URL ?? "";
 
+/** Extrai mensagem segura de erro (RFC 7807 Problem Details ou legado FastAPI). */
+export function parseApiError(body: unknown, status: number): string {
+  if (body && typeof body === "object") {
+    const record = body as Record<string, unknown>;
+    if (typeof record.detail === "string" && record.detail.trim()) {
+      return record.detail;
+    }
+    if (typeof record.message === "string" && record.message.trim()) {
+      return record.message;
+    }
+    if (Array.isArray(record.detail)) {
+      return "Os dados enviados são inválidos.";
+    }
+  }
+  if (status === 401) return "Não foi possível autenticar.";
+  if (status === 403) return "Você não tem permissão para esta ação.";
+  if (status === 404) return "Recurso não encontrado.";
+  if (status === 429) return "Muitas requisições. Tente novamente em instantes.";
+  if (status >= 500) return "Erro interno. Tente novamente mais tarde.";
+  return "Não foi possível concluir a operação.";
+}
+
+export type ActionResult = {
+  message: string;
+  data: Record<string, number>;
+};
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit & { json?: unknown } = {},
@@ -27,16 +54,13 @@ export async function apiFetch<T>(
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });
   if (!res.ok) {
-    let detail = res.statusText;
+    let body: unknown;
     try {
-      const body = await res.json();
-      if (typeof body?.detail === "string") detail = body.detail;
-      else if (Array.isArray(body?.detail))
-        detail = body.detail.map((d: { msg?: string }) => d.msg).join(", ");
+      body = await res.json();
     } catch {
-      if (res.status >= 500) detail = `Erro no servidor (${res.status}). Verifique o terminal do uvicorn.`;
+      body = null;
     }
-    throw new Error(detail || `HTTP ${res.status}`);
+    throw new Error(parseApiError(body, res.status));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -52,15 +76,13 @@ export async function loginRequest(email: string, password: string) {
     body,
   });
   if (!res.ok) {
-    let detail = "Falha no login";
+    let errBody: unknown;
     try {
-      const err = await res.json();
-      if (typeof err.detail === "string") detail = err.detail;
-      else if (Array.isArray(err.detail)) detail = err.detail.map((d: { msg?: string }) => d.msg).join(", ");
+      errBody = await res.json();
     } catch {
-      if (res.status >= 500) detail = `Erro no servidor (${res.status}). Verifique o terminal do uvicorn.`;
+      errBody = null;
     }
-    throw new Error(detail);
+    throw new Error(parseApiError(errBody, res.status));
   }
   return (await res.json()) as { access_token: string; token_type: string };
 }

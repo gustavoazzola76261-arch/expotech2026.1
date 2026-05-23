@@ -319,10 +319,21 @@ button:disabled {
 
 .consumption-toolbar {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 0.75rem;
   margin: 1rem 0;
+}
+
+.consumption-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1.25rem;
+}
+
+.room-filter-select {
+  min-width: 12rem;
+  margin-top: 0.35rem;
 }
 
 .toolbar-label {
@@ -514,11 +525,48 @@ button:disabled {
   overflow: auto;
 }
 
+.modal-panel-wide {
+  width: min(560px, 100%);
+}
+
 .modal-actions {
   display: flex;
   gap: 0.75rem;
   justify-content: flex-end;
   margin-top: 0.5rem;
+}
+
+.modal-actions-split {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lamp-edit-block {
+  border: 1px solid #334155;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.lamp-power-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.lamp-power-row {
+  display: grid;
+  grid-template-columns: 1fr 5rem auto;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.lamp-power-row input {
+  width: 100%;
 }
 
 .checkbox-row {
@@ -690,6 +738,148 @@ button:disabled {
   animation: lamp-pulse 2.5s ease-in-out infinite;
 }
 
+/* Ar-condicionado — canto direito da planta */
+.room-ac-stack {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  max-width: 42%;
+}
+
+.room-ac-control {
+  position: relative;
+  top: auto;
+  right: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.room-ac-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.room-ac-btn:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.room-ac-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.room-ac-btn.is-on {
+  animation: lamp-pulse 2.5s ease-in-out infinite;
+}
+
+.room-ac-caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.room-ac-btn.is-on .room-ac-caption {
+  color: #f8fafc;
+}
+
+.room-ac-temp,
+.room-ac-watts {
+  font-size: 0.65rem;
+  font-weight: 500;
+}
+
+.room-ac-temp-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+}
+
+.room-ac-temp-edit input {
+  width: 3.5rem;
+  padding: 0.2rem 0.35rem;
+  font-size: 0.8rem;
+}
+
+.ac-body,
+.ac-vent {
+  fill: #334155;
+  stroke: #475569;
+  stroke-width: 1;
+  transition:
+    fill 0.35s ease,
+    stroke 0.35s ease;
+}
+
+.ac-lines,
+.ac-led {
+  stroke: #64748b;
+  fill: #64748b;
+  transition:
+    stroke 0.35s ease,
+    fill 0.35s ease;
+}
+
+.ac-unit-on .ac-body,
+.ac-unit-on .ac-vent {
+  fill: #f8fafc;
+  stroke: #e2e8f0;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85));
+}
+
+.ac-unit-on .ac-lines,
+.ac-unit-on .ac-led {
+  stroke: #fff;
+  fill: #fff;
+}
+
+.ac-unit-off .ac-body,
+.ac-unit-off .ac-vent,
+.ac-unit-off .ac-lines,
+.ac-unit-off .ac-led {
+  filter: none;
+}
+
+.bulk-actions-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.bulk-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.room-bulk-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .dashboard-header {
   display: flex;
   flex-wrap: wrap;
@@ -772,6 +962,24 @@ button:disabled {
 
 .room-preview-dot.off {
   background: #334155;
+}
+
+.room-preview-ac {
+  position: absolute;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  opacity: 0.95;
+}
+
+.room-preview-ac.on .ac-unit-svg {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.75));
+}
+
+.room-preview-ac.off {
+  opacity: 0.55;
 }
 
 .room-preview-caption {

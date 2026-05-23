@@ -4,7 +4,8 @@ from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.database import SessionLocal
-from app.models import Lamp, Room, User, UserRole, UserRoom
+from app.models import AirConditioner, Lamp, Room, User, UserRole, UserRoom
+from app.models.air_conditioner import DEFAULT_AC_TEMP_C
 
 
 def main() -> None:
@@ -32,6 +33,16 @@ def main() -> None:
                         is_on=False,
                     )
                 )
+            db.add(
+                AirConditioner(
+                    room_id=r.id,
+                    name="Ar 1",
+                    slot=1,
+                    power_watts=1500,
+                    is_on=False,
+                    target_temp_c=DEFAULT_AC_TEMP_C,
+                )
+            )
 
         admin = User(
             email="admin@fecaf.local",

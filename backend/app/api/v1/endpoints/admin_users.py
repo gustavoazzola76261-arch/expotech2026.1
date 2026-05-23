@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.api_errors import conflict, not_found, validation
 from app.database import get_db
 from app.models import User, UserRole
 from app.schemas.user import UserCreate, UserReadAdmin, UserUpdate
@@ -43,17 +44,11 @@ def create_user_admin(
     email = payload.email.lower().strip()
     exists = db.scalars(select(User).where(User.email == email)).first()
     if exists:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        raise conflict(public_key="email_taken", log_detail=f"create user email={email}")
     if payload.role == UserRole.professor and not payload.room_ids:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Professors must be linked to at least one room",
-        )
+        raise validation(public_key="professor_needs_room", log_detail="create professor no rooms")
     if payload.role != UserRole.professor and payload.room_ids:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="room_ids only applies to professor role",
-        )
+        raise validation(public_key="room_ids_professor_only", log_detail="room_ids on non-professor")
     user = create_user(
         db,
         email=email,
@@ -74,7 +69,7 @@ def update_user_admin(
 ) -> UserReadAdmin:
     user = db.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        raise not_found(log_detail=f"user id={user_id}")
     apply_user_update(db, user=user, payload=payload, admin=admin)
     db.commit()
     db.refresh(user)

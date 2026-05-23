@@ -19,10 +19,7 @@
 /** Intervalo entre consultas à API (ms) */
 #define POLL_INTERVAL_MS 2000
 
-/**
- * GPIO por sala e slot (slot 1 = frente, 2 = meio, 3 = fundo).
- * Ajuste conforme seu hardware (relés active-HIGH = lâmpada ligada).
- */
+/* --- Lâmpadas (relés) --- */
 #define ROOM1_SLOT1_PIN 25
 #define ROOM1_SLOT2_PIN 26
 #define ROOM1_SLOT3_PIN 27
@@ -30,3 +27,28 @@
 #define ROOM2_SLOT1_PIN 14
 #define ROOM2_SLOT2_PIN 12
 #define ROOM2_SLOT3_PIN 13
+
+/* --- Ar-condicionado (módulo IR) — GPIO do LED transmissor por sala --- */
+#define ROOM1_AC_IR_PIN 4
+#define ROOM2_AC_IR_PIN 5
+
+/**
+ * Com ENABLE_AC_IR_LIBRARY=1, descomente e ajuste o protocolo à marca do ar:
+ * #define AC_IR_PROTOCOL decode_type_t::COOLIX
+ * (GREE, LG, SAMSUNG_AC, DAIKIN, etc. — veja IRremoteESP8266 SupportedProtocols.md)
+ */
+
+/**
+ * TESTE DE COMUNICAÇÃO IR — uma sala por vez:
+ * Descomente UMA linha, grave o firmware, abra Serial 115200.
+ * No boot a ESP envia LIGAR 23°C e DESLIGAR só para essa sala.
+ * Repita para cada ar trocando o ID.
+ */
+// #define TEST_IR_ROOM_ID 1
+// #define TEST_IR_ROOM_ID 2
+
+/**
+ * 1 = envia sinal IR real (instale biblioteca IRremoteESP8266).
+ * 0 ou omitido = apenas log no Serial (útil sem hardware IR).
+ */
+// #define ENABLE_AC_IR_LIBRARY 1

@@ -1,11 +1,12 @@
 from collections.abc import Callable
 import secrets
 
-from fastapi import Depends, Header, HTTPException, Query, status
+from fastapi import Depends, Header, Query
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.core.api_errors import APIError, ErrorCode, forbidden, unauthorized
 from app.core.security import decode_token
 from app.database import get_db
 from app.models import User, UserRole
@@ -24,7 +25,7 @@ def verify_esp32_device(
     x_device_key: str | None = Depends(device_key_header),
     device_key: str | None = Query(
         default=None,
-        description="Somente para testes no navegador/Swagger. A ESP32 deve usar o header X-Device-Key.",
+        description="Somente para testes. A ESP32 deve usar o header X-Device-Key.",
     ),
 ) -> None:
     settings = get_settings()
@@ -32,20 +33,13 @@ def verify_esp32_device(
     expected = _normalize_key(settings.esp32_device_key)
 
     if not provided:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=(
-                "Chave do dispositivo ausente. Envie o header X-Device-Key "
-                "(ou query device_key=... apenas em testes)."
-            ),
-        )
+        raise unauthorized(log_detail="device key missing")
     if not secrets.compare_digest(provided, expected):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=(
-                "Invalid device key. Confira ESP32_DEVICE_KEY em backend/.env "
-                "(reinicie o uvicorn após alterar) e DEVICE_KEY no config.h da ESP."
-            ),
+        raise APIError(
+            401,
+            ErrorCode.UNAUTHORIZED,
+            public_key="device_credentials",
+            log_detail="device key mismatch",
         )
 
 
@@ -55,28 +49,25 @@ def get_current_user(
 ) -> User:
     try:
         payload = decode_token(token)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-        ) from None
+    except ValueError as exc:
+        raise unauthorized(log_detail="jwt decode failed") from exc
     sub = payload.get("sub")
     if sub is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise unauthorized(log_detail="jwt missing sub")
     try:
         user_id = int(sub)
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except (TypeError, ValueError) as exc:
+        raise unauthorized(log_detail="jwt invalid sub") from exc
     user = db.get(User, user_id)
     if not user or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive or missing user")
+        raise unauthorized(log_detail=f"user inactive or missing id={user_id}")
     return user
 
 
 def require_roles(*roles: UserRole) -> Callable[..., User]:
     def _inner(user: User = Depends(get_current_user)) -> User:
         if user.role not in roles:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+            raise forbidden(log_detail=f"role {user.role} not in {roles}")
         return user
 
     return _inner

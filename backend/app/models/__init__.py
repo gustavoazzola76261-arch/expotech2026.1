@@ -1,4 +1,6 @@
+from app.models.ac_actuation_log import AcActuationLog
 from app.models.actuation_log import ActuationLog
+from app.models.air_conditioner import AirConditioner
 from app.models.campus_ia_state import CampusIAState
 from app.models.base import Base
 from app.models.enums import LampAction, ScheduleScope, UserRole
@@ -12,10 +14,12 @@ __all__ = [
     "Base",
     "User",
     "Room",
+    "AirConditioner",
     "Lamp",
     "LampSchedule",
     "UserRoom",
     "ActuationLog",
+    "AcActuationLog",
     "CampusIAState",
     "UserRole",
     "LampAction",

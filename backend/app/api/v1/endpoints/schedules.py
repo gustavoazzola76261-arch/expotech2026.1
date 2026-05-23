@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_roles
+from app.core.api_errors import not_found, validation
 from app.database import get_db
 from app.models import Lamp, LampSchedule, Room, User, UserRole
 from app.models.enums import ScheduleScope
@@ -139,7 +140,7 @@ def update_schedule(
 ) -> ScheduleRead:
     schedule = db.get(LampSchedule, schedule_id)
     if not schedule:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Programação não encontrada")
+        raise not_found(log_detail=f"schedule id={schedule_id}")
 
     data = payload.model_dump(exclude_unset=True)
     if "name" in data and data["name"] is not None:
@@ -192,7 +193,7 @@ def delete_schedule(
 ) -> None:
     schedule = db.get(LampSchedule, schedule_id)
     if not schedule:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Programação não encontrada")
+        raise not_found(log_detail=f"schedule id={schedule_id}")
     db.delete(schedule)
     db.commit()
 
@@ -207,31 +208,25 @@ def _validate_targets(
 ) -> None:
     if scope == ScheduleScope.room:
         if room_id is None or not db.get(Room, room_id):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Sala inválida")
+            raise validation(public_key="schedule_target_invalid", log_detail="schedule room target")
     elif scope == ScheduleScope.rooms_group:
         if not room_ids:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Selecione ao menos uma sala no grupo",
-            )
+            raise validation(public_key="schedule_rooms_required", log_detail="schedule rooms group empty")
         for rid in room_ids:
             if not db.get(Room, rid):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Sala inválida: {rid}",
+                raise validation(
+                    public_key="schedule_target_invalid",
+                    log_detail=f"schedule invalid room_id={rid}",
                 )
     elif scope == ScheduleScope.lamp:
         if lamp_id is None or not db.get(Lamp, lamp_id):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Lâmpada inválida")
+            raise validation(public_key="schedule_target_invalid", log_detail="schedule lamp target")
     elif scope == ScheduleScope.lamps_group:
         if not lamp_ids:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Selecione ao menos uma lâmpada no grupo",
-            )
+            raise validation(public_key="schedule_lamps_required", log_detail="schedule lamps group empty")
         for lid in lamp_ids:
             if not db.get(Lamp, lid):
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Lâmpada inválida: {lid}",
+                raise validation(
+                    public_key="schedule_target_invalid",
+                    log_detail=f"schedule invalid lamp_id={lid}",
                 )

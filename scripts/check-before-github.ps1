@@ -29,7 +29,20 @@ $mustIgnore = @(
     "frontend\.env",
     "IA\.env",
     "esp32\campus_iot\config.h",
-    "crewAI.py"
+    "crewAI.py",
+    "crewAI.py.example"
+)
+
+$mustNotTrackMd = @(
+    "BACKEND.md",
+    "FRONTEND.md",
+    "IA.md",
+    "ESP32.md",
+    "SCRIPTS.md",
+    "SECURITY.md",
+    "resumo.md",
+    "REQUISITOS_SISTEMA.md",
+    "esp32\GUIA_ESP32.md"
 )
 
 foreach ($rel in $mustIgnore) {
@@ -64,6 +77,26 @@ if ($null -ne $git) {
     $allTracked = @(git ls-files 2>$null)
     if ($allTracked -match "^\.venv/|^backend/\.venv/|node_modules") {
         Fail "Ambiente virtual ou node_modules rastreado - remova do Git"
+    }
+
+    foreach ($rel in $mustNotTrackMd) {
+        $norm = $rel -replace "\\", "/"
+        & git ls-files --error-unmatch $norm 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Fail "$norm esta RASTREADO - use: git rm --cached $norm"
+        }
+    }
+
+    & git ls-files --error-unmatch "crewAI.py.example" 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Fail "crewAI.py.example esta RASTREADO - use: git rm --cached crewAI.py.example"
+    }
+
+    $trackedMd = @(git ls-files "*.md" 2>$null)
+    foreach ($md in $trackedMd) {
+        if ($md -ne "README.md") {
+            Fail "Arquivo .md rastreado (so README.md permitido): $md"
+        }
     }
 }
 else {

@@ -2,13 +2,13 @@
 
 Projeto acadêmico da **Expotech 2026** para controle inteligente de iluminação em salas de faculdade, com API REST, interface web, integração IoT (ESP32) e análise energética assistida por IA.
 
-Documento de requisitos detalhado: [`REQUISITOS_SISTEMA.md`](REQUISITOS_SISTEMA.md).
+Documentação complementar (arquivos `.md` locais, não versionados no GitHub): `resumo.md`, `BACKEND.md`, `FRONTEND.md`, `IA.md`, `ESP32.md`, `SCRIPTS.md`, `SECURITY.md`, `REQUISITOS_SISTEMA.md`, `esp32/GUIA_ESP32.md`.
 
 ---
 
 ## Visão geral do projeto
 
-O **Campus IoT** é um sistema **API-first** que centraliza o acionamento de lâmpadas por sala, registra histórico de uso, estima consumo em **kWh** e **R$** (tarifa Enel) e oferece painéis por perfil de usuário (professor, mestre, administrador). A arquitetura monorepo separa backend, frontend, firmware e módulo de IA, permitindo evoluir para novos dispositivos (MQTT, sensores, climatização) sem reescrever o núcleo.
+O **Campus IoT** é um sistema **API-first** que centraliza o acionamento de **lâmpadas e ar-condicionado** por sala, registra histórico de uso, estima consumo em **kWh** e **R$** (tarifa Enel) e oferece painéis por perfil de usuário (professor, mestre, administrador). A arquitetura monorepo separa backend, frontend, firmware e módulo de IA, permitindo evoluir para novos dispositivos (MQTT, sensores) sem reescrever o núcleo.
 
 O problema atacado é o **desperdício energético** e a **falta de rastreabilidade** em ambientes acadêmicos: lâmpadas ligadas sem necessidade, controle manual descentralizado e ausência de relatórios sobre quem acionou o quê, quando e quanto foi consumido.
 
@@ -33,17 +33,17 @@ O problema atacado é o **desperdício energético** e a **falta de rastreabilid
 ### Controle e salas
 
 - Login com OAuth2 (password) + JWT.
-- Dashboard de salas com visualização do estado das lâmpadas.
-- Ligar/desligar lâmpadas individualmente ou em lote (sala inteira / todas as salas).
+- Dashboard de salas com visualização de **lâmpadas e ar-condicionado** (ícones ligado/desligado).
+- Ligar/desligar lâmpadas e aparelhos de ar individualmente ou em lote (por sala ou campus), sem entrar na sala.
 - Professor acessa apenas salas vinculadas; mestre e admin gerenciam o campus.
-- CRUD de salas (criação com até 3 lâmpadas por sala).
+- CRUD de salas com quantidade e potência (W) de lâmpadas e ar (0 a 4 aparelhos por sala).
 
 ### Consumo e relatórios
 
-- Cálculo de **kWh** ao desligar (potência × tempo ligado).
+- Cálculo de **kWh** ao desligar lâmpadas e ar (potência × tempo ligado).
 - Estimativa de custo em **R$** com composição tarifária **Enel** (TE + TUSD + bandeira + tributos).
-- Gráficos mensais (1, 3, 6 ou 12 meses) em kWh e R$.
-- Histórico de acionamentos (admin).
+- Gráficos mensais (1, 3, 6 ou 12 meses) em kWh e R$, com **filtro por sala**.
+- Histórico de acionamentos de lâmpadas (admin).
 
 ### Programação
 
@@ -58,7 +58,7 @@ O problema atacado é o **desperdício energético** e a **falta de rastreabilid
 ### IoT (ESP32)
 
 - Endpoint de estado para firmware (`X-Device-Key`).
-- Guia em [`esp32/GUIA_ESP32.md`](esp32/GUIA_ESP32.md).
+- Guia de hardware em `esp32/GUIA_ESP32.md` (arquivo local, não versionado).
 
 ### Inteligência artificial
 
@@ -126,7 +126,8 @@ expotech2026/
 │   ├── alembic/             # Migrations
 │   ├── app/
 │   │   ├── api/v1/endpoints/  # Rotas REST
-│   │   ├── core/              # JWT, hash de senha
+│   │   ├── core/              # JWT, hash, mensagens seguras de erro
+│   │   ├── api/exception_handlers.py  # RFC 7807 Problem Details
 │   │   ├── models/            # SQLAlchemy
 │   │   ├── schemas/           # Pydantic
 │   │   ├── services/          # Regras de negócio, IA context, Enel, scheduler
@@ -146,10 +147,8 @@ expotech2026/
 │   ├── config.py
 │   └── requirements.txt
 ├── esp32/
-│   ├── campus_iot/          # Firmware
-│   └── GUIA_ESP32.md
-├── crewAI.py.example        # Exemplo original CrewAI
-├── REQUISITOS_SISTEMA.md
+│   └── campus_iot/          # Firmware
+├── scripts/                 # Checagens locais (ex.: pré-GitHub)
 └── README.md
 ```
 
@@ -162,7 +161,9 @@ expotech2026/
 | Pasta / arquivo | Responsabilidade |
 |-----------------|------------------|
 | `api/v1/endpoints/` | Rotas HTTP por domínio (auth, rooms, lamps, consumption, schedules, ia, iot, admin). |
-| `api/deps.py` | Dependências FastAPI: usuário atual, papéis exigidos. |
+| `api/deps.py` | Dependências FastAPI: usuário atual, papéis, chave ESP32. |
+| `core/api_errors.py` | Códigos e mensagens públicas de erro (OWASP). |
+| `api/exception_handlers.py` | Respostas `application/problem+json`. |
 | `models/` | Entidades: `User`, `Room`, `Lamp`, `ActuationLog`, `LampSchedule`, etc. |
 | `schemas/` | Contratos de entrada/saída (Pydantic). |
 | `services/` | Lógica: `access` (RBAC, estado lâmpadas), `rooms`, `enel_tariff`, `scheduler`, `ia_data`. |
@@ -175,7 +176,7 @@ expotech2026/
 |-------|------------------|
 | `pages/` | Telas: login, salas, consumo, IA, programação, admin. |
 | `components/` | Layout, planta da sala, previews. |
-| `api/client.ts` | `fetch` autenticado e login OAuth2. |
+| `api/client.ts` | `fetch` autenticado, login OAuth2, parse de erros RFC 7807. |
 | `types.ts` | Tipos TypeScript alinhados à API. |
 
 ### IA (`IA/`)
@@ -285,6 +286,35 @@ Altere essas senhas antes de qualquer ambiente real.
 
 Base: `/api/v1` — autenticação via `Authorization: Bearer <token>` (exceto login e health).
 
+### Formato das respostas
+
+**Sucesso**
+
+- Recursos: JSON do schema documentado no Swagger (`LampRead`, `RoomOverview`, etc.).
+- Comandos em lote (`POST .../all-on`, `all-off`): `{ "message": "...", "data": { "turned_on": N } }`.
+- Criação `201`, exclusão `204` sem corpo.
+
+**Erros (RFC 7807 + boas práticas OWASP)**
+
+Content-Type: `application/problem+json`
+
+```json
+{
+  "type": "urn:campus-iot:error:not_found",
+  "title": "Not Found",
+  "status": 404,
+  "code": "NOT_FOUND",
+  "detail": "Recurso não encontrado."
+}
+```
+
+- Mensagens **genéricas** para o cliente; detalhes técnicos apenas nos **logs do servidor**.
+- Login: mesma mensagem para credenciais inválidas ou usuário inativo (não revela se o e-mail existe).
+- Validação de formulário (`422`): `"Os dados enviados são inválidos."` (sem expor estrutura interna).
+- Erros `5xx`: nunca incluem stack trace, caminhos de arquivo ou chaves de configuração.
+
+Códigos estáveis: `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `VALIDATION`, `RATE_LIMITED`, `SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`.
+
 ### Meta
 
 | Método | Caminho | Descrição |
@@ -305,22 +335,25 @@ Base: `/api/v1` — autenticação via `Authorization: Bearer <token>` (exceto l
 |--------|---------|-----------|--------|
 | GET | `/rooms` | Lista salas | Autenticado |
 | GET | `/rooms/overview` | Salas + lâmpadas | Autenticado |
-| POST | `/rooms` | Cria sala + 3 lâmpadas | Mestre, Admin |
-| PATCH | `/rooms/{id}` | Atualiza sala | Mestre, Admin |
+| POST | `/rooms` | Cria sala (lâmpadas + ar configuráveis) | Mestre, Admin |
+| PATCH | `/rooms/{id}` | Atualiza sala, lâmpadas e ar | Mestre, Admin |
 | GET | `/rooms/{id}/lamps` | Lâmpadas da sala | Autenticado |
-| POST | `/rooms/{id}/lamps/all-off` | Desliga todas da sala | Mestre, Admin |
-| POST | `/rooms/{id}/lamps/all-on` | Liga todas da sala | Mestre, Admin |
-| POST | `/lamps/all-off` | Desliga todas (campus) | Mestre, Admin |
-| POST | `/lamps/all-on` | Liga todas (campus) | Mestre, Admin |
+| GET | `/rooms/{id}/ac` | Aparelhos de ar da sala | Autenticado |
+| POST | `/rooms/{id}/lamps/all-off` \| `all-on` | Lote lâmpadas da sala | Mestre, Admin |
+| POST | `/rooms/{id}/ac/all-off` \| `all-on` | Lote ar da sala | Mestre, Admin |
+| POST | `/lamps/all-off` \| `all-on` | Lote lâmpadas (campus) | Mestre, Admin |
+| POST | `/ac/all-off` \| `all-on` | Lote ar (campus) | Mestre, Admin |
 | GET | `/lamps/{id}` | Detalhe lâmpada | Autenticado |
 | POST | `/lamps/{id}/command` | `{"action":"on"\|"off"}` | Autenticado |
+| POST | `/ac/{id}/command` | Liga/desliga aparelho de ar | Autenticado |
+| PATCH | `/ac/{id}/temperature` | Ajusta temperatura (°C) | Mestre, Admin |
 
 ### Consumo
 
 | Método | Caminho | Descrição | Papel |
 |--------|---------|-----------|--------|
 | GET | `/consumption/summary` | Total kWh e R$ | Admin |
-| GET | `/consumption/monthly?months=1\|3\|6\|12` | Série mensal | Admin |
+| GET | `/consumption/monthly?months=1\|3\|6\|12&room_id=` | Série mensal (filtro sala opcional) | Admin |
 
 ### Programação
 
@@ -360,11 +393,14 @@ Escopos: `all`, `room`, `rooms_group`, `lamp`, `lamps_group`.
 - **Senhas:** hash bcrypt; nunca armazenar texto puro.
 - **JWT:** expiração configurável (`ACCESS_TOKEN_EXPIRE_MINUTES`).
 - **RBAC:** papéis `professor`, `mestre`, `admin`; professor restrito às salas em `user_rooms`.
-- **Rate limiting:** SlowAPI disponível (login e rotas sensíveis).
+- **Respostas de erro:** formato Problem Details; sem vazamento de paths, SQL, chaves ou IDs internos em mensagens públicas (alinhado a OWASP API Security).
+- **Rate limiting:** SlowAPI disponível (handler com mensagem genérica `429`).
 - **CORS:** origens configuráveis + regex para rede local (`192.168.x.x`, `10.x.x.x`).
-- **IoT:** chave de dispositivo (`ESP32_DEVICE_KEY` / `X-Device-Key`).
+- **IoT:** chave de dispositivo (`ESP32_DEVICE_KEY` / `X-Device-Key`); comparação com `compare_digest`.
 - **Segredos:** não versionar `.env`, chaves Supabase `service_role` ou `GROQ_API_KEY`.
 - **LGPD (base):** logs com usuário e timestamp; minimizar dados em relatórios de IA conforme política institucional.
+
+Consulte `SECURITY.md` na cópia local do projeto (não versionado no GitHub).
 
 ---
 
@@ -392,7 +428,7 @@ Escopos: `all`, `room`, `rooms_group`, `lamp`, `lamps_group`.
 |------|--------|
 | **Curto prazo** | MQTT para ESP32; ampliar cobertura de salas no firmware; testes de API. |
 | **Médio prazo** | Simulação de cenários de consumo; cache de insights IA; export PDF dos relatórios. |
-| **Longo prazo** | Novos dispositivos (ar-condicionado, sensores de presença); dashboard em tempo real; integração SSO institucional. |
+| **Longo prazo** | Sensores de presença; dashboard em tempo real; integração SSO institucional; MQTT. |
 
 ---
 
@@ -402,7 +438,7 @@ Projeto desenvolvido no contexto acadêmico **Expotech 2026** / FECAF.
 
 | Papel | Responsabilidades |
 |-------|-------------------|
-| **Product / requisitos** | Alinhamento com `REQUISITOS_SISTEMA.md`, escopo e priorização. |
+| **Product / requisitos** | Escopo, requisitos e priorização. |
 | **Backend** | API FastAPI, banco, agendador, integração IA e IoT. |
 | **Frontend** | Interface React, UX de salas, consumo e IA. |
 | **IoT** | Firmware ESP32 e documentação de hardware. |
@@ -432,15 +468,12 @@ Antes do primeiro `git push`, execute:
 .\scripts\check-before-github.ps1
 ```
 
-O repositório **não deve** incluir: `.env` reais, `esp32/campus_iot/config.h`, `crewAI.py` com chaves, `.venv/`, `node_modules/` ou dumps de banco. Use apenas os arquivos `*.env.example` e `config.h.example`.
-
-Detalhes: [`SECURITY.md`](SECURITY.md).
+O repositório **não deve** incluir: `.env` reais, `esp32/campus_iot/config.h`, `crewAI.py` / `crewAI.py.example`, outros `.md` além deste `README.md`, `.venv/`, `node_modules/` ou dumps de banco. Use apenas os arquivos `*.env.example` e `config.h.example`.
 
 ---
 
 ## Referências rápidas
 
-- Requisitos: [`REQUISITOS_SISTEMA.md`](REQUISITOS_SISTEMA.md)
-- ESP32: [`esp32/GUIA_ESP32.md`](esp32/GUIA_ESP32.md)
-- Exemplo CrewAI: [`crewAI.py.example`](crewAI.py.example)
+- Guia ESP32 (local): `esp32/GUIA_ESP32.md`
 - Configuração IA: [`IA/.env.example`](IA/.env.example)
+- Backend: `backend/.env.example` · Frontend: `frontend/.env.example`

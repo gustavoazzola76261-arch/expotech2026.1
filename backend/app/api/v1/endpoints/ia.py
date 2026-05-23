@@ -4,11 +4,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
 from app.config import get_settings
+from app.core.api_errors import internal_error, service_unavailable, validation
 from app.database import get_db
 from app.models import User, UserRole
 from app.schemas.ia import (
@@ -86,17 +87,11 @@ async def generate_energy_insights(
     room_id: int | None = Query(default=None),
 ) -> IAInsightsResponse:
     if months not in _ALLOWED_WINDOWS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="months deve ser 1, 3, 6 ou 12",
-        )
+        raise validation(public_key="months_invalid", log_detail=f"ia months={months}")
 
     settings = get_settings()
     if not settings.groq_api_key.strip():
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="IA indisponível: configure GROQ_API_KEY no arquivo backend/.env",
-        )
+        raise service_unavailable(public_key="ia_unavailable", log_detail="groq api key missing")
 
     ia_row = get_ia_state(db)
     op_ctx = ia_row.operation_context
@@ -114,13 +109,10 @@ async def generate_energy_insights(
         )
         result = await asyncio.to_thread(run_energy_insights, context, ia_settings)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise service_unavailable(public_key="ia_unavailable", log_detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Falha ao executar CrewAI")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Erro ao gerar insights com IA: {exc}",
-        ) from exc
+        raise internal_error(log_detail=str(exc)) from exc
 
     generated_at = datetime.now(timezone.utc)
     stored = {

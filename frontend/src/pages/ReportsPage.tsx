@@ -13,7 +13,7 @@ import {
 } from "recharts";
 
 import { apiFetch } from "../api/client";
-import type { ConsumptionMonthlyResponse, Me } from "../types";
+import type { ConsumptionMonthlyResponse, Me, Room } from "../types";
 
 const WINDOW_OPTIONS = [
   { value: 1 as const, label: "Este mês" },
@@ -33,19 +33,31 @@ function formatBrl(value: string | number): string {
   return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-async function fetchMonthly(months: number): Promise<ConsumptionMonthlyResponse> {
-  return apiFetch<ConsumptionMonthlyResponse>(`/api/v1/consumption/monthly?months=${months}`);
+async function fetchRooms(): Promise<Room[]> {
+  return apiFetch<Room[]>("/api/v1/rooms");
+}
+
+async function fetchMonthly(months: number, roomId: number | null): Promise<ConsumptionMonthlyResponse> {
+  const params = new URLSearchParams({ months: String(months) });
+  if (roomId != null) params.set("room_id", String(roomId));
+  return apiFetch<ConsumptionMonthlyResponse>(`/api/v1/consumption/monthly?${params}`);
 }
 
 export function ReportsPage() {
   const [months, setMonths] = useState<1 | 3 | 6 | 12>(12);
+  const [roomId, setRoomId] = useState<number | null>(null);
   const { data: me, isLoading: loadingMe } = useQuery({
     queryKey: ["me"],
     queryFn: () => apiFetch<Me>("/api/v1/me"),
   });
+  const { data: rooms } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: fetchRooms,
+    enabled: me?.role === "admin",
+  });
   const { data, isLoading, error } = useQuery({
-    queryKey: ["consumption-monthly", months],
-    queryFn: () => fetchMonthly(months),
+    queryKey: ["consumption-monthly", months, roomId],
+    queryFn: () => fetchMonthly(months, roomId),
     enabled: me?.role === "admin",
   });
 
@@ -67,29 +79,55 @@ export function ReportsPage() {
   if (error) return <p className="error-banner">{(error as Error).message}</p>;
 
   const tariff = data?.tariff;
+  const roomLabel =
+    roomId == null ? "Todas as salas" : rooms?.find((r) => r.id === roomId)?.name ?? `Sala #${roomId}`;
 
   return (
     <div>
       <h2>Consumo de energia</h2>
       <p className="muted">
-        kWh registrados ao desligar lâmpadas. Valor em R$ estimado pela tarifa {tariff?.distributor ?? "Enel"} (
-        {tariff?.tariff_group ?? "Grupo B"}) — TE + TUSD + bandeira + ICMS e PIS/COFINS.
+        kWh registrados ao desligar lâmpadas e ar-condicionado. Valor em R$ estimado pela tarifa{" "}
+        {tariff?.distributor ?? "Enel"} ({tariff?.tariff_group ?? "Grupo B"}) — TE + TUSD + bandeira + ICMS e
+        PIS/COFINS.
       </p>
 
       <div className="consumption-toolbar card">
-        <span className="toolbar-label">Período</span>
-        <div className="filter-chips">
-          {WINDOW_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              className={months === opt.value ? "chip chip-active" : "chip"}
-              onClick={() => setMonths(opt.value)}
+        <div className="consumption-filters">
+          <div>
+            <span className="toolbar-label">Período</span>
+            <div className="filter-chips">
+              {WINDOW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={months === opt.value ? "chip chip-active" : "chip"}
+                  onClick={() => setMonths(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="toolbar-label">Sala</span>
+            <select
+              className="room-filter-select"
+              value={roomId ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setRoomId(v === "" ? null : Number(v));
+              }}
             >
-              {opt.label}
-            </button>
-          ))}
+              <option value="">Todas as salas</option>
+              {rooms?.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.code})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+        <p className="muted small">Filtro ativo: {roomLabel}</p>
         <div className="period-total period-total-dual">
           <div>
             <span className="muted">Energia no período</span>

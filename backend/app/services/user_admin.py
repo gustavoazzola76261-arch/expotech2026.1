@@ -1,8 +1,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from fastapi import HTTPException, status
-
+from app.core.api_errors import bad_request, conflict, validation
 from app.core.security import hash_password
 from app.models import User, UserRole, UserRoom
 from app.schemas.user import UserUpdate
@@ -27,15 +26,9 @@ def apply_user_update(
 ) -> None:
     if user.id == admin.id:
         if payload.is_active is False:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Você não pode desativar a própria conta",
-            )
+            raise bad_request(public_key="self_deactivate", log_detail="admin self deactivate")
         if payload.role is not None and payload.role != UserRole.admin:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Você não pode remover o próprio perfil de administrador",
-            )
+            raise bad_request(public_key="self_demote_admin", log_detail="admin self demote")
 
     was_professor = user.role == UserRole.professor
 
@@ -44,7 +37,7 @@ def apply_user_update(
         if new_email != user.email:
             exists = db.scalars(select(User).where(User.email == new_email)).first()
             if exists:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
+                raise conflict(public_key="email_taken", log_detail=f"email={new_email}")
         user.email = new_email
 
     if payload.full_name is not None:
@@ -66,13 +59,7 @@ def apply_user_update(
     else:
         if payload.room_ids is not None:
             if not payload.room_ids:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="Professor deve ter ao menos uma sala vinculada",
-                )
+                raise validation(public_key="professor_needs_room", log_detail="empty room_ids")
             _set_user_rooms_no_commit(db, user.id, payload.room_ids)
         elif not was_professor:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Ao tornar usuário professor, informe room_ids com ao menos uma sala",
-            )
+            raise validation(public_key="professor_room_ids", log_detail="new professor without rooms")

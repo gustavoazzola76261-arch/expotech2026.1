@@ -22,25 +22,47 @@ export function DashboardPage() {
     refetchInterval: 5000,
   });
 
-  const allOff = useMutation({
+  const allLampsOff = useMutation({
     mutationFn: () => apiFetch<{ turned_off: number }>("/api/v1/lamps/all-off", { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
   });
 
-  const allOn = useMutation({
+  const allLampsOn = useMutation({
     mutationFn: () => apiFetch<{ turned_on: number }>("/api/v1/lamps/all-on", { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
   });
 
-  const roomOff = useMutation({
+  const allAcOff = useMutation({
+    mutationFn: () => apiFetch<{ turned_off: number }>("/api/v1/ac/all-off", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
+  });
+
+  const allAcOn = useMutation({
+    mutationFn: () => apiFetch<{ turned_on: number }>("/api/v1/ac/all-on", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
+  });
+
+  const roomLampsOff = useMutation({
     mutationFn: (roomId: number) =>
       apiFetch<{ turned_off: number }>(`/api/v1/rooms/${roomId}/lamps/all-off`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
   });
 
-  const roomOn = useMutation({
+  const roomLampsOn = useMutation({
     mutationFn: (roomId: number) =>
       apiFetch<{ turned_on: number }>(`/api/v1/rooms/${roomId}/lamps/all-on`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
+  });
+
+  const roomAcOff = useMutation({
+    mutationFn: (roomId: number) =>
+      apiFetch<{ turned_off: number }>(`/api/v1/rooms/${roomId}/ac/all-off`, { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
+  });
+
+  const roomAcOn = useMutation({
+    mutationFn: (roomId: number) =>
+      apiFetch<{ turned_on: number }>(`/api/v1/rooms/${roomId}/ac/all-on`, { method: "POST" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["rooms-overview"] }),
   });
 
@@ -68,32 +90,44 @@ export function DashboardPage() {
       <div className="dashboard-header">
         <div>
           <h2>Salas</h2>
-          <p className="muted">Visualize o estado atual. Clique na sala para controlar as lâmpadas.</p>
+          <p className="muted">
+            Visualize lâmpadas e ar-condicionado. Clique na sala para controle detalhado.
+          </p>
         </div>
         {canBulk && (
-          <div className="bulk-actions">
-            <button type="button" className="btn-secondary" disabled={allOn.isPending} onClick={() => allOn.mutate()}>
-              Ligar todas
-            </button>
-            <button type="button" className="btn-danger-outline" disabled={allOff.isPending} onClick={() => allOff.mutate()}>
-              Desligar todas
-            </button>
+          <div className="bulk-actions bulk-actions-stacked">
+            <div className="bulk-actions-row">
+              <span className="toolbar-label">Lâmpadas</span>
+              <button type="button" className="btn-secondary" disabled={allLampsOn.isPending} onClick={() => allLampsOn.mutate()}>
+                Ligar todas
+              </button>
+              <button type="button" className="btn-danger-outline" disabled={allLampsOff.isPending} onClick={() => allLampsOff.mutate()}>
+                Desligar todas
+              </button>
+            </div>
+            <div className="bulk-actions-row">
+              <span className="toolbar-label">Ar</span>
+              <button type="button" className="btn-secondary" disabled={allAcOn.isPending} onClick={() => allAcOn.mutate()}>
+                Ligar todos
+              </button>
+              <button type="button" className="btn-danger-outline" disabled={allAcOff.isPending} onClick={() => allAcOff.mutate()}>
+                Desligar todos
+              </button>
+            </div>
           </div>
         )}
       </div>
-
-      {allOff.isSuccess && (
-        <p className="muted small">Último comando global: {allOff.data?.turned_off ?? 0} lâmpada(s) desligada(s).</p>
-      )}
-      {allOn.isSuccess && (
-        <p className="muted small">Último comando global: {allOn.data?.turned_on ?? 0} lâmpada(s) ligada(s).</p>
-      )}
 
       <div className="room-overview-grid">
         {data?.map((room) => (
           <div key={room.id} className="card room-overview-card">
             <Link to={`/salas/${room.id}`} className="room-overview-link">
-              <RoomPreviewMini lamps={room.lamps} roomName={room.name} roomCode={room.code} />
+              <RoomPreviewMini
+                lamps={room.lamps}
+                airConditioners={room.air_conditioners}
+                roomName={room.name}
+                roomCode={room.code}
+              />
             </Link>
             <div className="room-overview-actions">
               <Link to={`/salas/${room.id}`} className="inline-link">
@@ -104,19 +138,39 @@ export function DashboardPage() {
                   <button
                     type="button"
                     className="btn-secondary"
-                    disabled={roomOn.isPending}
-                    onClick={() => roomOn.mutate(room.id)}
+                    disabled={roomLampsOn.isPending}
+                    onClick={() => roomLampsOn.mutate(room.id)}
                   >
-                    Ligar sala
+                    Ligar lâmpadas
                   </button>
                   <button
                     type="button"
                     className="btn-secondary"
-                    disabled={roomOff.isPending}
-                    onClick={() => roomOff.mutate(room.id)}
+                    disabled={roomLampsOff.isPending}
+                    onClick={() => roomLampsOff.mutate(room.id)}
                   >
-                    Desligar sala
+                    Desligar lâmpadas
                   </button>
+                  {room.air_conditioners.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={roomAcOn.isPending}
+                        onClick={() => roomAcOn.mutate(room.id)}
+                      >
+                        Ligar ar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={roomAcOff.isPending}
+                        onClick={() => roomAcOff.mutate(room.id)}
+                      >
+                        Desligar ar
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>

@@ -24,8 +24,13 @@ credentials.json
 # ESP32 — copie de config.h.example e preencha localmente
 esp32/campus_iot/config.h
 
-# Script local com chave Groq (use crewAI.py.example como modelo)
+# Script local com chave Groq
 crewAI.py
+crewAI.py.example
+
+# Documentação local (apenas README.md vai para o GitHub)
+*.md
+!/README.md
 
 # =============================================================================
 # Python

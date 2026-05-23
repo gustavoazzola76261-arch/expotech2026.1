@@ -2,13 +2,13 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_roles
+from app.core.api_errors import validation
 from app.database import get_db
-from app.models import ActuationLog, Lamp, User, UserRole
+from app.models import User, UserRole
 from app.schemas.consumption import (
     ConsumptionMonthlyPoint,
     ConsumptionMonthlyResponse,
@@ -16,6 +16,7 @@ from app.schemas.consumption import (
     EnelTariffInfo,
 )
 from app.services.enel_tariff import energy_cost_brl, tariff_info
+from app.services.energy import monthly_energy_by_key, sum_total_energy_kwh
 
 router = APIRouter(prefix="/consumption", tags=["consumption"])
 
@@ -45,17 +46,7 @@ def consumption_summary(
     _: User = Depends(require_roles(UserRole.admin)),
     room_id: int | None = Query(default=None),
 ) -> ConsumptionSummary:
-    if room_id is not None:
-        lamp_ids_subq = select(Lamp.id).where(Lamp.room_id == room_id)
-    else:
-        lamp_ids_subq = select(Lamp.id)
-
-    stmt = select(func.coalesce(func.sum(ActuationLog.energy_kwh), 0)).where(
-        ActuationLog.energy_kwh.isnot(None),
-        ActuationLog.lamp_id.in_(lamp_ids_subq),
-    )
-    total = db.scalar(stmt)
-    total_kwh = Decimal(str(total or 0))
+    total_kwh = sum_total_energy_kwh(db, room_id=room_id)
     return ConsumptionSummary(
         total_kwh=total_kwh,
         total_brl=energy_cost_brl(total_kwh),
@@ -71,42 +62,11 @@ def consumption_monthly(
     room_id: int | None = Query(default=None, description="Filtrar por sala (opcional)"),
 ) -> ConsumptionMonthlyResponse:
     if months not in _ALLOWED_WINDOWS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="months deve ser 1, 3, 6 ou 12",
-        )
+        raise validation(public_key="months_invalid", log_detail=f"months={months}")
 
     now = datetime.now(timezone.utc)
     start = _window_start(months, now)
-
-    if room_id is not None:
-        lamp_ids_subq = select(Lamp.id).where(Lamp.room_id == room_id)
-    else:
-        lamp_ids_subq = select(Lamp.id)
-
-    bucket = func.date_trunc("month", ActuationLog.created_at)
-    stmt = (
-        select(bucket, func.coalesce(func.sum(ActuationLog.energy_kwh), 0))
-        .where(
-            ActuationLog.energy_kwh.isnot(None),
-            ActuationLog.created_at >= start,
-            ActuationLog.created_at <= now,
-            ActuationLog.lamp_id.in_(lamp_ids_subq),
-        )
-        .group_by(bucket)
-        .order_by(bucket)
-    )
-    rows = db.execute(stmt).all()
-
-    by_month: dict[str, Decimal] = {}
-    for row in rows:
-        b = row[0]
-        if b is None:
-            continue
-        if b.tzinfo is None:
-            b = b.replace(tzinfo=timezone.utc)
-        key = f"{b.year:04d}-{b.month:02d}"
-        by_month[key] = Decimal(str(row[1] or 0))
+    by_month = monthly_energy_by_key(db, start=start, end=now, room_id=room_id)
 
     keys = _month_keys_between(start, now)
     points = []

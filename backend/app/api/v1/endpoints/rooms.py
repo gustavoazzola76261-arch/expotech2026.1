@@ -1,16 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user, require_roles
+from app.core.api_errors import forbidden, not_found
 from app.database import get_db
-from app.models import Lamp, Room, User, UserRole
+from app.models import AirConditioner, Lamp, Room, User, UserRole
+from app.schemas.ac import AirConditionerRead
+from app.schemas.errors import ActionResult
 from app.schemas.lamp import LampRead
 from app.schemas.room import RoomCreate, RoomOverview, RoomRead, RoomUpdate
 from app.services.access import can_access_room, professor_room_ids, turn_off_all_lamps, turn_on_all_lamps
-from app.services.rooms import change_room_id, create_room_with_optional_id
+from app.services.ac import turn_off_all_acs, turn_on_all_acs
+from app.services.rooms import create_room_with_optional_id, delete_room, update_room_details
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
+
+
+def _require_room(db: Session, user: User, room_id: int) -> Room:
+    if not can_access_room(db, user, room_id):
+        raise forbidden(log_detail=f"room access denied room_id={room_id} user={user.id}")
+    room = db.get(Room, room_id)
+    if not room:
+        raise not_found(log_detail=f"room id={room_id}")
+    return room
 
 
 @router.get("", response_model=list[RoomRead])
@@ -32,7 +45,11 @@ def rooms_overview(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[RoomOverview]:
-    stmt = select(Room).options(selectinload(Room.lamps)).order_by(Room.id)
+    stmt = (
+        select(Room)
+        .options(selectinload(Room.lamps), selectinload(Room.air_conditioners))
+        .order_by(Room.id)
+    )
     if user.role == UserRole.professor:
         ids = professor_room_ids(db, user)
         if not ids:
@@ -42,12 +59,14 @@ def rooms_overview(
     result: list[RoomOverview] = []
     for room in rooms:
         lamps = sorted(room.lamps, key=lambda lamp: (lamp.slot, lamp.id))
+        acs = sorted(room.air_conditioners, key=lambda unit: (unit.slot, unit.id))
         result.append(
             RoomOverview(
                 id=room.id,
                 name=room.name,
                 code=room.code,
                 lamps=[LampRead.model_validate(lamp) for lamp in lamps],
+                air_conditioners=[AirConditionerRead.model_validate(unit) for unit in acs],
             )
         )
     return result
@@ -64,6 +83,10 @@ def create_room(
         name=payload.name,
         code=payload.code,
         room_id=payload.id,
+        lamp_count=payload.lamp_count,
+        default_power_watts=payload.default_power_watts,
+        ac_count=payload.ac_count,
+        default_ac_power_watts=payload.default_ac_power_watts,
     )
 
 
@@ -74,54 +97,82 @@ def update_room(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles(UserRole.admin, UserRole.mestre)),
 ) -> Room:
-    room = db.get(Room, room_id)
-    if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sala não encontrada")
-
-    if payload.new_id is not None:
-        room = change_room_id(db, room_id, payload.new_id)
-        room_id = room.id
-
-    if payload.code is not None:
-        code = payload.code.strip().upper()
-        other = db.scalars(select(Room).where(Room.code == code, Room.id != room_id)).first()
-        if other:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Código de sala já existe")
-        room.code = code
-    if payload.name is not None:
-        room.name = payload.name.strip()
-
-    db.commit()
-    db.refresh(room)
-    return room
+    return update_room_details(
+        db,
+        room_id,
+        name=payload.name,
+        code=payload.code,
+        lamps=payload.lamps,
+        air_conditioners=payload.air_conditioners,
+    )
 
 
-@router.post("/{room_id}/lamps/all-off")
+@router.delete("/{room_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_room(
+    room_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles(UserRole.admin, UserRole.mestre)),
+) -> None:
+    delete_room(db, room_id)
+
+
+@router.post("/{room_id}/lamps/all-off", response_model=ActionResult)
 def room_all_lamps_off(
     room_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.admin, UserRole.mestre)),
-) -> dict[str, int]:
-    if not can_access_room(db, user, room_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem acesso à sala")
-    if not db.get(Room, room_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sala não encontrada")
+) -> ActionResult:
+    _require_room(db, user, room_id)
     count = turn_off_all_lamps(db, room_id=room_id)
-    return {"turned_off": count}
+    return ActionResult(message="Comando enviado: desligar lâmpadas da sala.", data={"turned_off": count})
 
 
-@router.post("/{room_id}/lamps/all-on")
+@router.post("/{room_id}/lamps/all-on", response_model=ActionResult)
 def room_all_lamps_on(
     room_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.admin, UserRole.mestre)),
-) -> dict[str, int]:
-    if not can_access_room(db, user, room_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem acesso à sala")
-    if not db.get(Room, room_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sala não encontrada")
+) -> ActionResult:
+    _require_room(db, user, room_id)
     count = turn_on_all_lamps(db, room_id=room_id)
-    return {"turned_on": count}
+    return ActionResult(message="Comando enviado: ligar lâmpadas da sala.", data={"turned_on": count})
+
+
+@router.post("/{room_id}/ac/all-off", response_model=ActionResult)
+def room_all_ac_off(
+    room_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin, UserRole.mestre)),
+) -> ActionResult:
+    _require_room(db, user, room_id)
+    count = turn_off_all_acs(db, room_id=room_id)
+    return ActionResult(message="Comando enviado: desligar ar da sala.", data={"turned_off": count})
+
+
+@router.post("/{room_id}/ac/all-on", response_model=ActionResult)
+def room_all_ac_on(
+    room_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.admin, UserRole.mestre)),
+) -> ActionResult:
+    _require_room(db, user, room_id)
+    count = turn_on_all_acs(db, room_id=room_id)
+    return ActionResult(message="Comando enviado: ligar ar da sala.", data={"turned_on": count})
+
+
+@router.get("/{room_id}/ac", response_model=list[AirConditionerRead])
+def list_room_ac(
+    room_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[AirConditioner]:
+    _require_room(db, user, room_id)
+    stmt = (
+        select(AirConditioner)
+        .where(AirConditioner.room_id == room_id)
+        .order_by(AirConditioner.slot, AirConditioner.id)
+    )
+    return list(db.scalars(stmt).all())
 
 
 @router.get("/{room_id}/lamps", response_model=list[LampRead])
@@ -130,10 +181,6 @@ def list_room_lamps(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[Lamp]:
-    if not can_access_room(db, user, room_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No access to this room")
-    room = db.get(Room, room_id)
-    if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    _require_room(db, user, room_id)
     stmt = select(Lamp).where(Lamp.room_id == room_id).order_by(Lamp.slot, Lamp.id)
     return list(db.scalars(stmt).all())
